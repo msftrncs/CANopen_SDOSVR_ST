@@ -2,7 +2,7 @@
 
 This repository will hold a protocol processor written in IEC 61131-3 structured text for the CANopen SDO protocol.
 
-It will handle upload and download of both expedited and segmented transfers.  It can handle up to three simultaneous transfers; 1 segmented upload, 1 segmented download, and 1 expedited transfer in either direction.  It can handle an enumeration interface (broadcast request) if provided by the CAN interface pre-processor.
+It will handle upload and download of both expedited and segmented transfers.  It can handle up to three simultaneous transfers; 1 segmented upload, 1 segmented download, and 1 expedited transfer in either direction.  It can handle an enumeration interface (broadcast request) if provided by the CAN interface pre-processor, which mutes certain error responses.
 
 You must supply a CAN interface pre-processor (receive) and post-processor (transmit), as the SDO Server Protocol Processor is implemented to be independent of CAN interface implementations.  You must also provide the dictionary object handling post-processor.  This increases flexibility and benefits code reuse.
 
