@@ -9,6 +9,6 @@ You must supply a CAN interface pre-processor (receive) and post-processor (tran
 This implementation is based on a CoDeSys V2.3 environment.  It has been tested on IFM Classic and NT hardware.  It has been utilized in an application which involved multiple separate dictionary object post-processors and multiple CAN interface implementations on a single controller, including multiple instances of the SDO Server Protocol Processor.
 
 Additional notes:
-1. A function block named TOS is not contained here.  It is a timer function block like the standard function block TP, but with RESET(RS) and CLEAR(C) functionality via actions.  It will be coming to a separate repository.
+1. Please see the repository [TOS_ST](https://github.com/msftrncs/TOS_ST) for the function block TOS.  It is a timer function block like the standard function block TP, but with RESTART(RS) and CLEAR(C) functionality via actions.  It is used for handling activity time-out.
 1. Non IEC actions are used by this protocol processor, both for private and for public purposes.  Support for this could vary.
 1. More information will be coming for examples as to how to construct pre-processor/post-processor and dictionary object handlers and interface them with the protocol processor, and an application.
