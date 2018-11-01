@@ -19,7 +19,7 @@ Please see the declaration of FB_SDOSVR_PROC for further implementation details.
 
 -- -
 ## SDO SVR CAN Preprocessor IFM NT.ST
-This is an example CAN preprocessor for use with IFM NT hardware.  It includes a function block implementation for enumeration as well.  The action `InitSvr()` should be called for initialization of the FB `FB_SDOSVR_CAN_NT`.
+This is an example CAN preprocessor for use with IFM NT hardware.  It includes a function block implementation for enumeration as well.  The action `InitSvr()` should be called for initialization of the function block `FB_SDOSVR_CAN_NT`.
 
 ### FB_SDOSVR_CAN_NT
 This function block includes an instance of FB_SDOSVR_PROC, and is the primary application interface to the SDO server for a given CAN implementation, in this case, for IFM NT hardware.  The instance of FB_SDOSVR_PROC (SDOSVR_PROC) is accessible to the application, as dictionary object processing will require direct interaction with the SDO server core, and not with the CAN preprocessor.
@@ -30,6 +30,7 @@ An action called during application initialization to initialize CAN implementat
 ### FB_FB_SDOSVR_CAN_NT_ENUM_RX
 This function block handles just the receiving of enumeration requests from the CAN implementation.  See the application implementation hint below for how it is used.
 
+### Application Example
 In general this is how the function block `FB_SDOSVR_CAN_NT` would be utilized in the application, including with enumeration support:
 
 ```PASCAL
