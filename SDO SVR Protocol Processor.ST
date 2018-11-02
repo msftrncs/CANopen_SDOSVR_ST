@@ -21,7 +21,7 @@ END_VAR
 VAR_OUTPUT
 	CANSDO_TX : BOOL := FALSE; (* preprocessor should transmit data buffer as response *)
 
-	Request_RESULT : BYTE := 0; (* result of any pending request processing, 0=nothing to process, 1=more to process, 2=dispatching upload request, 3=dispatching download request, 4=terminating download normal, 5=aborting download, 6=pending aborted download, 7=pending normal download termination *)
+	Request_RESULT : BYTE := 0; (* result of any pending request processing, 0=nothing to process, 1=more to process, 2=dispatching upload request, 3=dispatching download request, 4=terminating download normal, 5=aborting download, 6=pending aborted download, 7=pending expedited download acknowledgement *)
 		(* Understanding Requst_RESULT:
 			0 = There is no active transfer occuring, however, CANSDO_TX could be pending a transmission to complete the last transfer.
 			1 = A transfer is ongoing, CANSDO_TX could be pending a transmission as part of the transfer.
@@ -29,8 +29,8 @@ VAR_OUTPUT
 			3 = Application needs to respond to a download request, either supplying a destination for the requested object, requesting an INV_SIDX or other suitable error, else an automatic INV_OBJ error will be sent.
 			4 = Application needs to respond to a download completion, optionally requesting an error be sent if neccessary, else an aknowledgement will be sent. (BufferOverrun is considered normal completion, app is to check Response_BUFFEROVERRUN)
 			5 = Application is being notified of an aborted download, CANSDO_TX could be pending a transmission to signal an internal error, application not permitted to request an error indication.
-			6 = An abortion of a download is pending from an application action, will be applied at next cleanup.
-			7 = Termination of an expedited download is pending from an application action, will be applied at next cleanup.  *)
+			6 = An abortion of a download is pending from an application action, will be applied at next cleanup, this is a private RESULT and application shall not react to it.
+			7 = Acknowledgment of an expedited download is pending from an application action, will be applied at next cleanup.  *)
 	Request_OBJ : WORD; (* Object ID of the SDO request *)
 	Request_SIDX : BYTE; (* object sub-index of the SDO request *)
 	Request_EXP : BOOL; (* Request is expedited (result = download request only, invalid all other times) *)
@@ -56,7 +56,6 @@ VAR
 	ActXfr_Dn_SeqTog : BOOL; (* toggle status of 't' sequence of next expected packet *)
 	ActXfr_Dn_LTMR : TOS; (* timer to track silence of the download data segments *)
 
-	CMD_CCS : BYTE; (* SDO command value; 0 segment download, 1 initiate download, 2 initiate upload, 3 segment upload, 4 abort, 5 block transfer upload, 6 block transfer download, 7 reserved *)
 	CMD_N : BYTE; (* number of data bytes used in the payload (this packet), this can be influenced by packet DLC if S bit not set when E bit is set *)
 
 	i : USINT; (* character counter *)
@@ -66,19 +65,26 @@ VAR CONSTANT
 	2017-01-30 CMM V1.0001, added ENUM flag which prevents error responses, INV_OBJ, INV_SIDX and BAD_CMD's to initiate requests, fixed
 	BAD_CMD response to prevent aborting an already active session for the same object.  Added TX ACK_EXP_DN and TX_EXP_UP_RESP to allow
 	object handlers to expedite handling of expedite results, which should reduce redundant buffer copies.
+
+	2018-11-01 CMM V1.0002, removed CMD_CCS (BYTE) from VAR, implemented directly in CASE statement.  Segment Upload (CCS=3) didn't clear TO timer
+	upon normal completion.  Optimization in Segment Download (CCS=0) not update buffer pointer upon termination.  Request_LEN was filled
+	even when NOT Request_LEN_KNOWN for non-expedited downloads, is now set = 0.  TX_ACK_EXP_DN action clears CANSDO_IsEnum, DispatchResponse altered
+	to not duplicate this action.  Action TX_ERR_NO_DATA was marked private.  Actions TX_ERR_BAD_SIZE, TX_ERR_INV_VAL, TX_ERR_NO_DATA, TX_ERR_R_ONLY, 
+	TX_ERR_W_ONLY now clear CANSDO_IsEnum.  Clarified some comments, added comments to clarify some code.  TX_EXP_UP_RESP now limits Request_LEN to
+	maximum of 4 incase of bad input.  Added CleanUp to CLEAR_TX_REQ.
 *)
-	SDOSVR_Version : DWORD := 10001; (* version of SDO Server Processor, Vx.yzzz *)
+	SDOSVR_Version : DWORD := 10002; (* version of SDO Server Processor, Vx.yzzz *)
 END_VAR
 
 (* @END_DECLARATION := '0' *)
 (* when called, there is data to process in RX buffers *)
 IF CANSDO_DLC >= 1 THEN
 	(* there must be at least 1 byte in order to be a valid command, which could be for a segmented or block transfer *)
-	CMD_CCS := SHR( CANSDO_DATA[0], 5 );
-	CASE CMD_CCS OF
+	(* SDO command value; 0 segment download, 1 initiate download, 2 initiate upload, 3 segment upload, 4 abort, 5 block transfer upload, 6 block transfer download, 7 reserved *)
+	CASE SHR( CANSDO_DATA[0], 5 ) OF
 	0:	(* segmented download data packet *)
 		IF ActXfr_Dn THEN
-			CMD_N := 7 - (SHR( CANSDO_DATA[0], 1 ) AND 7);
+			CMD_N := 7 - (SHR( CANSDO_DATA[0], 1 ) AND 7); (* number of data bytes in payload *)
 			IF ((CANSDO_DLC - 1) < CMD_N) OR (CANSDO_DATA[0].4 <> ActXfr_Dn_SeqTog) THEN
 				(* datagram inconsistency, abort transfer *)
 				ActXfr_Dn := FALSE;
@@ -108,7 +114,6 @@ IF CANSDO_DLC >= 1 THEN
 					i := i + 1; (* next byte *)
 				END_WHILE
 				ActXfr_Dn_DLC := ActXfr_Dn_DLC + i; (* add bytes processed *)
-				ActXfr_Dn_BufPtr := ActXfr_Dn_BufPtr + USINT_TO_DWORD( i ); (* advance buffer pointer *)
 				IF i <> CMD_N OR CANSDO_DATA[0].0 THEN
 					(* either ran out of buffer or segmented transfer is complete *)
 					ActXfr_Dn := FALSE;
@@ -125,6 +130,7 @@ IF CANSDO_DLC >= 1 THEN
 					END_IF
 					ActXfr_Dn_LTMR.C; (* clearing inactivity timer *)
 				ELSE
+					ActXfr_Dn_BufPtr := ActXfr_Dn_BufPtr + USINT_TO_DWORD( i ); (* advance buffer pointer *)
 					ActXfr_Dn_SeqTog := NOT ActXfr_Dn_SeqTog; (* toggle T expected next *)
 					IF ActXfr_Dn_LTMR.IN THEN
 						ActXfr_Dn_LTMR.SR; (* reset timer, if already active *)
@@ -155,7 +161,8 @@ IF CANSDO_DLC >= 1 THEN
 				IF SEL( Request_LEN_KNOWN, FALSE, CANSDO_DLC < 8 ) THEN
 					TX_ERR_BAD_CMD; (* command doesn't make sense, not enough data was supplied *)
 				ELSE
-					Request_LEN := SHL( BYTE_TO_DWORD( CANSDO_DATA[7] ), 24 ) + SHL( BYTE_TO_DWORD( CANSDO_DATA[6] ), 16 ) + SHL( BYTE_TO_DWORD( CANSDO_DATA[5] ), 8 ) + CANSDO_DATA[4];
+					Request_LEN := SEL( Request_LEN_KNOWN, 0, SHL( BYTE_TO_DWORD( CANSDO_DATA[7] ), 24 ) +
+					  SHL( BYTE_TO_DWORD( CANSDO_DATA[6] ), 16 ) + SHL( BYTE_TO_DWORD( CANSDO_DATA[5] ), 8 ) + CANSDO_DATA[4] );
 					Request_RESULT := 3; (* dispatch a download *)
 					Response_TO_TIME := Std_XfrDn_TO_TIME; (* set response default TO time to standard *)
 				END_IF
@@ -193,6 +200,7 @@ IF CANSDO_DLC >= 1 THEN
 				IF ActXfr_Up_BufRem = 0 THEN
 					ActXfr_Up := FALSE; (* transfer is complete *)
 					Request_RESULT := SEL( ActXfr_Dn, 0, 1 ); (* reflect if another transfer in progress *)
+					ActXfr_Up_LTMR.C; (* clearing inactivity timer *)
 				ELSE
 					ActXfr_Up_BufPtr := ActXfr_Up_BufPtr + USINT_TO_DWORD( i ); (* update buffer for next segment *)
 				END_IF
@@ -280,24 +288,31 @@ END_IF
 END_ACTION
 
 ACTION	CleanUp:
+(* Processing CleanUp, intended for the CAN implementation to utilize if Request_RESULT is > 1 prior
+   to processing of the next received request. *)
 (* handle cleanup if application doesn't react to Request_RESULT, as its not really required to *)
 CASE Request_RESULT OF
 2,3:
 	(* download or upload request was not acted upon, must be an invalid object *)
 	TX_ERR_INV_OBJ; (* object of request must have been invalid and could not be found *)
 4,5:
+	(* when = 4, applicatiom must have accepted the download completion without error *)
 	Request_RESULT := SEL( ActXfr_Dn OR ActXfr_Up, 0, 1 );
 6:
+	(* application accepted an upload request which coincides with an active download,
+	   the download is being aborted, so notify the application.  *)
 	Request_RESULT := 5;
 7:
+	(* application must have accepted the expedited download without error *)
 	TX_ACK_EXP_DN;
 END_CASE
 
 END_ACTION
 
 ACTION	CLEAR_TX_REQ:
-(* CAN interface has transmitted our buffer *)
+(* CAN interface has transmitted our buffer, intended for use by the CAN preprocessor *)
 CANSDO_TX := FALSE;
+CleanUp; (* clear TX flag and clean up previous request results or pending actions *)
 END_ACTION
 
 ACTION	DispatchResponse:
@@ -317,7 +332,7 @@ IF Request_RESULT = 2 THEN
 		END_WHILE
 		TX_EXP_UP_RESP; (* let action complete this transaction *)
 	ELSE
-		(* standard response with segmented transfer to CONTINUE *)
+		(* standard response with segmented transfer to continue *)
 		ActXfr_Up_BufPtr := Response_BUFFER_PTR;
 		ActXfr_Up_BufRem := Response_BUFFER_LEN;
 		ActXfr_Up_OBJ := Request_OBJ;
@@ -366,9 +381,9 @@ ELSIF Request_RESULT = 3 THEN
 		Request_LEN := i; (* length of data downloaded *)
 		(* if request length was known, then its a problem if there was more data than buffer, but not if length was not known *)
 		Request_BUFFEROVERRUN := SEL( Request_LEN_KNOWN, FALSE, i > Response_BUFFER_LEN );
-		Request_RESULT := 7; (* pending a normal download termination *)
+		Request_RESULT := 7; (* pending an aknowledgement of expedited download *)
 	ELSE
-		(* download is segmented, RETURN a confirmation message to start segments flowing *)
+		(* download is segmented, return a confirmation message to start segments flowing *)
 		ActXfr_Dn_BufPtr := Response_BUFFER_PTR;
 		ActXfr_Dn_BufLen := Response_BUFFER_LEN;
 		ActXfr_Dn_DLC := 0;
@@ -386,8 +401,8 @@ ELSIF Request_RESULT = 3 THEN
 		ELSE
 			ActXfr_Dn_LTMR.C; (* clear timer, not requested for this response *)
 		END_IF
+		CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
 	END_IF
-	CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
 END_IF
 
 END_ACTION
@@ -399,6 +414,8 @@ CANSDO_DATA[0] := 16#60; (* dwonload acknowledge *)
 CANSDO_DATA[4] := CANSDO_DATA[5] := CANSDO_DATA[6] := CANSDO_DATA[7] := 0;
 CANSDO_DLC := 8;
 CANSDO_TX := TRUE;
+CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
+
 Request_RESULT := 4;
 
 END_ACTION
@@ -450,6 +467,7 @@ CANSDO_DATA[6] := 7;
 CANSDO_DATA[7] := 6; (* 0x06070010 *)
 CANSDO_DLC := 8;
 CANSDO_TX := TRUE;
+CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
 
 Request_RESULT := SEL( ActXfr_Dn OR ActXfr_Up, 0, 1 );
 
@@ -511,13 +529,14 @@ CANSDO_DATA[6] := 9;
 CANSDO_DATA[7] := 6; (* 0x06090030 *)
 CANSDO_DLC := 8;
 CANSDO_TX := TRUE;
+CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
 
 Request_RESULT := SEL( ActXfr_Dn OR ActXfr_Up, 0, 1 );
 
 END_ACTION
 
 ACTION	TX_ERR_NO_DATA:
-(* TX a ERROR message NO DATA {Private!} *)
+(* TX a ERROR message NO DATA {For Object Handler responses} (usually for upload requests that cannot respond due to other criteria) *)
 
 (* Data cannot be accepted or sent at this time *)
 CANSDO_DATA[0] := 16#80; (* Abort command *)
@@ -528,6 +547,7 @@ CANSDO_DATA[6] := 0;
 CANSDO_DATA[7] := 8; (* 0x08000020 *)
 CANSDO_DLC := 8;
 CANSDO_TX := TRUE;
+CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
 
 Request_RESULT := SEL( ActXfr_Dn OR ActXfr_Up, 0, 1 );
 
@@ -562,6 +582,7 @@ CANSDO_DATA[6] := 1;
 CANSDO_DATA[7] := 6; (* 0x06010002 *)
 CANSDO_DLC := 8;
 CANSDO_TX := TRUE;
+CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
 
 Request_RESULT := SEL( ActXfr_Dn OR ActXfr_Up, 0, 1 );
 
@@ -613,6 +634,7 @@ CANSDO_DATA[6] := 1;
 CANSDO_DATA[7] := 6; (* 0x06010002 *)
 CANSDO_DLC := 8;
 CANSDO_TX := TRUE;
+CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
 
 Request_RESULT := SEL( ActXfr_Dn OR ActXfr_Up, 0, 1 );
 
@@ -622,7 +644,7 @@ ACTION	TX_EXP_UP_RESP:
 (* TX an expedited upload response, OBJ, SIDX and DATA are loaded in CAN message, Response_BUFFER_LEN is length specified, 0 = unspecified *)
 (* application object dispatch may directly expedite data to CANSDO_DATA[4..7] and submit here to complete transaction (only way to submit an unspecified length) *)
 
-CANSDO_DATA[0] := 16#43 + SEL( Response_BUFFER_LEN = 0, SHL( 4 - DWORD_TO_BYTE( Response_BUFFER_LEN ), 2 ), -1 ); (* encode response length, note -1 when no length specified *)
+CANSDO_DATA[0] := 16#43 + SEL( Response_BUFFER_LEN = 0, SHL( 4 - DWORD_TO_BYTE( MIN( Response_BUFFER_LEN, DWORD#4 ) ), 2 ), -1 ); (* encode response length, note -1 when no length specified *)
 CANSDO_DLC := 8;
 CANSDO_TX := TRUE;
 CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)

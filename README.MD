@@ -31,9 +31,9 @@ An action called during application initialization to initialize CAN implementat
 This function block handles just the receiving of enumeration requests from the CAN implementation.  See the application implementation hint below for how it is used.
 
 ### Application Example
-In general this is how the function block `FB_SDOSVR_CAN_NT` would be utilized in the application, including with enumeration support:
+In general this is how the function block `FB_SDOSVR_CAN_NT` (along with `FB_SDOSVR_CAN_NT_ENUM_RX` for enumeration support) would be utilized in the application:
 
-```PASCAL
+```Pascal
 VAR
 	SDO_CAN1 : FB_SDOSVR_CAN_NT := ( CHANNEL:=1 ); (* SDO processing engine *)
 	SDO_CAN1_ENUM : FB_SDOSVR_CAN_NT_ENUM_RX := ( CHANNEL:=1 ); (* SDO processing engine enumeration receiver for all nodes on CAN 1 *)
@@ -60,7 +60,8 @@ REPEAT
 				RAST_STRG_ID30;     (* handle auto storage events *)
 			END_IF
 		END_IF
-	UNTIL SEL( SDO_CAN1.TX_BUFFER_FULL, SDO_CAN1.RX_BUFFER_EMPTY AND NOT (SDO_CAN1.SDOSVR_PROC.CANSDO_TX OR SDO_CAN1.Enum_RX_Flag OR SDO_CAN1.Chk_Timers) AND SDO_CAN1.SDOSVR_PROC.Request_RESULT <= 1, TRUE )
+	UNTIL SEL( SDO_CAN1.TX_BUFFER_FULL, SDO_CAN1.RX_BUFFER_EMPTY AND NOT (SDO_CAN1.SDOSVR_PROC.CANSDO_TX OR 
+	  SDO_CAN1.Enum_RX_Flag) AND SDO_CAN1.SDOSVR_PROC.Request_RESULT <= 1, TRUE )
 	END_REPEAT
 UNTIL NOT SDO_CAN1_ENUM.AVAILABLE
 END_REPEAT
@@ -83,3 +84,6 @@ Additional notes:
 1. Please see the repository [TOS_ST](https://github.com/msftrncs/TOS_ST) for the function block TOS.  It is a timer function block like the standard function block TP, but with RESTART(RS) and CLEAR(C) functionality via actions.  It is used for handling activity time-out.
 1. Non IEC actions are used by this protocol processor, both for private and for public purposes.  Support for this could vary.
 1. More information will be coming for examples as to how to construct pre-processor/post-processor and dictionary object handlers and interface them with the protocol processor, and an application.
+
+Change Log:
+- 2018-11-02 - Chk_Timers was removed from the example CAN preprocessor, utilizing a different scheme to make sure the transfer timers are checked.  CLEAR_TX_REQ in the protocol processor automatically performs clean up, and this has been accounted for in the example preprocessor.
