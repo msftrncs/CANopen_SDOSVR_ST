@@ -332,7 +332,7 @@ IF Request_RESULT = 2 THEN
 		END_WHILE
 		TX_EXP_UP_RESP; (* let action complete this transaction *)
 	ELSE
-		(* standard response with segmented transfer to continue *)
+		(* standard response with segmented transfer to CONTINUE *)
 		ActXfr_Up_BufPtr := Response_BUFFER_PTR;
 		ActXfr_Up_BufRem := Response_BUFFER_LEN;
 		ActXfr_Up_OBJ := Request_OBJ;
@@ -383,7 +383,7 @@ ELSIF Request_RESULT = 3 THEN
 		Request_BUFFEROVERRUN := SEL( Request_LEN_KNOWN, FALSE, i > Response_BUFFER_LEN );
 		Request_RESULT := 7; (* pending an aknowledgement of expedited download *)
 	ELSE
-		(* download is segmented, return a confirmation message to start segments flowing *)
+		(* download is segmented, RETURN a confirmation message to start segments flowing *)
 		ActXfr_Dn_BufPtr := Response_BUFFER_PTR;
 		ActXfr_Dn_BufLen := Response_BUFFER_LEN;
 		ActXfr_Dn_DLC := 0;
