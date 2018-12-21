@@ -17,8 +17,6 @@ VAR_INPUT
 
 	HeartBeat_Prod_TM : TIME := t#1s; (* Producer Heartbeat time, 0x1017 *)
 END_VAR
-VAR_OUTPUT
-END_VAR
 VAR
 	Dn_Buffer : ARRAY[0..3] OF BYTE; (* buffer for downloading of objects *)
 (*	Up_Buffer : ARRAY[0..3] OF BYTE; (* buffer for uploading of objects *) *)
@@ -33,7 +31,7 @@ IF SDOSVR_PROC <> 0 THEN
 		16#1000:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSE
 				(* transfer device profile and features and submit to processor via expedited response *)
 				SDOSVR_PROC^.CANSDO_DATA[4] := WORD_TO_BYTE( DeviceType_Profile );
@@ -45,7 +43,7 @@ IF SDOSVR_PROC <> 0 THEN
 		16#1008:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSE
 				(* send device name string, if one is set *)
 				IF OBJ_DevName_String <> 0 THEN
@@ -55,7 +53,7 @@ IF SDOSVR_PROC <> 0 THEN
 		16#1009:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSE
 				(* send hw version string, if one is set *)
 				IF OBJ_HWVer_String <> 0 THEN
@@ -65,7 +63,7 @@ IF SDOSVR_PROC <> 0 THEN
 		16#100A:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSE
 				(* send sw version string, if one is set *)
 				IF OBJ_SWVer_String <> 0 THEN
@@ -75,7 +73,7 @@ IF SDOSVR_PROC <> 0 THEN
 		16#1017:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSE
 				(* upload request, deposit in SDO processor buffer and submit expedited response *)
 				SDOSVR_PROC^.CANSDO_DATA[4] := DWORD_TO_BYTE( MIN( TIME_TO_DWORD( HeartBeat_Prod_TM ), 65535 ) AND 16#FF );
@@ -94,28 +92,28 @@ IF SDOSVR_PROC <> 0 THEN
 		16#100A:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSE
 				(* client tried to download, object is read only *)
-				SDOSVR_PROC^.TX_ERR_R_ONLY;
+				SDOSVR_PROC^.TX_ERR_R_ONLY();
 			END_IF
 		16#1017:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSE
 				(* download request, if length known, and not right, reject it, else accept it to our buffer *)
 				IF SEL( SDOSVR_PROC^.Request_LEN_KNOWN, SDOSVR_PROC^.Request_LEN >= 2, SDOSVR_PROC^.Request_LEN = 2 ) THEN
 					IF SDOSVR_PROC^.Request_EXP THEN
 						(* with request expedited we'll just handle it here *)
 						HeartBeat_Prod_TM := DWORD_TO_TIME( SHL( BYTE_TO_DWORD( SDOSVR_PROC^.CANSDO_DATA[5] ), 8 ) +  SDOSVR_PROC^.CANSDO_DATA[4] );
-						SDOSVR_PROC^.TX_ACK_EXP_DN; (* acknowledge the download request *)
+						SDOSVR_PROC^.TX_ACK_EXP_DN(); (* acknowledge the download request *)
 					ELSE
 						(* requester didn't expedite but the length seems within reason so allow the request to CONTINUE *)
 						SDOSVR_PROC^.DispatchResponse( Response_BUFFER_LEN:=2, Response_BUFFER_PTR:=ADR( Dn_Buffer ) );
 					END_IF
 				ELSE
-					SDOSVR_PROC^.TX_ERR_BAD_SIZE; (* incorrect size for object *)
+					SDOSVR_PROC^.TX_ERR_BAD_SIZE(); (* incorrect size for object *)
 				END_IF
 			END_IF
 		END_CASE
@@ -129,7 +127,7 @@ IF SDOSVR_PROC <> 0 THEN
 				(* convert from little endian to big endian and store in register *)
 				HeartBeat_Prod_TM := DWORD_TO_TIME( SHL( BYTE_TO_DWORD( Dn_Buffer[1] ), 8 ) +  Dn_Buffer[0] );
 			ELSE
-				SDOSVR_PROC^.TX_ERR_BAD_SIZE; (* incorrect size for object *)
+				SDOSVR_PROC^.TX_ERR_BAD_SIZE(); (* incorrect size for object *)
 			END_IF
 		END_CASE
 
@@ -144,10 +142,10 @@ IF SDOSVR_PROC <> 0 THEN
 		16#1000:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSIF SDOSVR_PROC^.Request_RESULT = 3 THEN
 				(* client tried to download, object is read only *)
-				SDOSVR_PROC^.TX_ERR_R_ONLY;
+				SDOSVR_PROC^.TX_ERR_R_ONLY();
 			ELSE
 				(* transfer device profile and features and submit to processor via expedited response *)
 				SDOSVR_PROC^.CANSDO_DATA[4] := WORD_TO_BYTE( DeviceType_Profile );
@@ -159,49 +157,49 @@ IF SDOSVR_PROC <> 0 THEN
 		16#1008:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSIF SDOSVR_PROC^.Request_RESULT = 3 THEN
 				(* client tried to download, object is read only *)
-				SDOSVR_PROC^.TX_ERR_R_ONLY;
+				SDOSVR_PROC^.TX_ERR_R_ONLY();
 			ELSIF OBJ_DevName_String <> 0 THEN
 				SDOSVR_PROC^.DispatchResponse( Response_BUFFER_LEN:=LEN( OBJ_DevName_String^ ), Response_BUFFER_PTR:=OBJ_DevName_String );
 			END_IF
 		16#1009:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSIF SDOSVR_PROC^.Request_RESULT = 3 THEN
 				(* client tried to download, object is read only *)
-				SDOSVR_PROC^.TX_ERR_R_ONLY;
+				SDOSVR_PROC^.TX_ERR_R_ONLY();
 			ELSIF OBJ_HWVer_String <> 0 THEN
 				SDOSVR_PROC^.DispatchResponse( Response_BUFFER_LEN:=LEN( OBJ_HWVer_String^ ), Response_BUFFER_PTR:=OBJ_HWVer_String );
 			END_IF
 		16#100A:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSIF SDOSVR_PROC^.Request_RESULT = 3 THEN
 				(* client tried to download, object is read only *)
-				SDOSVR_PROC^.TX_ERR_R_ONLY;
+				SDOSVR_PROC^.TX_ERR_R_ONLY();
 			ELSIF OBJ_SWVer_String <> 0 THEN
 				SDOSVR_PROC^.DispatchResponse( Response_BUFFER_LEN:=LEN( OBJ_SWVer_String^ ), Response_BUFFER_PTR:=OBJ_SWVer_String );
 			END_IF
 		16#1017:
 			IF SDOSVR_PROC^.Request_SIDX <> 0 THEN
 				(* object is wholly contained in SIDX 0 *)
-				SDOSVR_PROC^.TX_ERR_INV_SIDX;
+				SDOSVR_PROC^.TX_ERR_INV_SIDX();
 			ELSIF SDOSVR_PROC^.Request_RESULT = 3 THEN
 				(* download request, if length known, and not right, reject it, else accept it to our buffer *)
 				IF SEL( SDOSVR_PROC^.Request_LEN_KNOWN, SDOSVR_PROC^.Request_LEN >= 2, SDOSVR_PROC^.Request_LEN = 2 ) THEN
 					IF SDOSVR_PROC^.Request_EXP THEN
 						HeartBeat_Prod_TM := DWORD_TO_TIME( SHL( BYTE_TO_DWORD( SDOSVR_PROC^.CANSDO_DATA[5] ), 8 ) +  SDOSVR_PROC^.CANSDO_DATA[4] );
-						SDOSVR_PROC^.TX_ACK_EXP_DN; (* acknowledge the download request *)
+						SDOSVR_PROC^.TX_ACK_EXP_DN(); (* acknowledge the download request *)
 					ELSE
 						(* requester didn't expedite but the length seems within reason so allow the request to CONTINUE *)
 						SDOSVR_PROC^.DispatchResponse( Response_BUFFER_LEN:=2, Response_BUFFER_PTR:=ADR( Dn_Buffer ) );
 					END_IF
 				ELSE
-					SDOSVR_PROC^.TX_ERR_BAD_SIZE; (* incorrect size for object *)
+					SDOSVR_PROC^.TX_ERR_BAD_SIZE(); (* incorrect size for object *)
 				END_IF
 			ELSIF SDOSVR_PROC^.Request_RESULT = 4 THEN
 				(* download completed, save value, if right number of bytes received, not overrunning our buffer *)
@@ -209,7 +207,7 @@ IF SDOSVR_PROC <> 0 THEN
 					(* convert from little endian to big endian and store in register *)
 					HeartBeat_Prod_TM := DWORD_TO_TIME( SHL( BYTE_TO_DWORD( Dn_Buffer[1] ), 8 ) +  Dn_Buffer[0] );
 				ELSE
-					SDOSVR_PROC^.TX_ERR_BAD_SIZE; (* incorrect size for object *)
+					SDOSVR_PROC^.TX_ERR_BAD_SIZE(); (* incorrect size for object *)
 				END_IF
 			ELSIF SDOSVR_PROC^.Request_RESULT = 2 THEN
 				(* upload request, deposit in SDO processor buffer and submit expedited response *)

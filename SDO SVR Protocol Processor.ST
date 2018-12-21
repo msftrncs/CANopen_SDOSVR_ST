@@ -98,11 +98,11 @@ IF CANSDO_DLC >= 1 THEN
 					CANSDO_DATA[1] := WORD_TO_BYTE( Request_OBJ AND 16#FF ); (* low order of index *)
 					CANSDO_DATA[2] := WORD_TO_BYTE( SHR( Request_OBJ, 8 ) ); (* high order of index *)
 					CANSDO_DATA[3] := Request_SIDX; (* sub index *)
-					TX_ERR_BAD_CMD; (* signal bad command error *)
+					TX_ERR_BAD_CMD(); (* signal bad command error *)
 				ELSE
-					TX_ERR_SEG_TOG; (* signal segment sequence error *)
+					TX_ERR_SEG_TOG(); (* signal segment sequence error *)
 				END_IF
-				ActXfr_Dn_LTMR.C; (* clearing inactivity timer *)
+				ActXfr_Dn_LTMR.C(); (* clearing inactivity timer *)
 			ELSE
 				(* transfer these bytes to the buffer, checking for overflow *)
 				i := 0;
@@ -124,18 +124,18 @@ IF CANSDO_DLC >= 1 THEN
 					Request_RESULT := 4; (* finishing the download normal, even if buffer overrun *)
 					IF Request_BUFFEROVERRUN THEN
 						(* need to report 'out of memory' error to client, but could be overwritten by app using another error *)
-						TX_ERR_OUT_OF_MEM;
+						TX_ERR_OUT_OF_MEM();
 					ELSE
-						TX_CNFM_SEG_DN; (* note this final confirmation may be overwritten by an error message *)
+						TX_CNFM_SEG_DN(); (* note this final confirmation may be overwritten by an error message *)
 					END_IF
-					ActXfr_Dn_LTMR.C; (* clearing inactivity timer *)
+					ActXfr_Dn_LTMR.C(); (* clearing inactivity timer *)
 				ELSE
 					ActXfr_Dn_BufPtr := ActXfr_Dn_BufPtr + USINT_TO_DWORD( i ); (* advance buffer pointer *)
 					ActXfr_Dn_SeqTog := NOT ActXfr_Dn_SeqTog; (* toggle T expected next *)
 					IF ActXfr_Dn_LTMR.IN THEN
-						ActXfr_Dn_LTMR.SR; (* reset timer, if already active *)
+						ActXfr_Dn_LTMR.SR(); (* reset timer, if already active *)
 					END_IF
-					TX_CNFM_SEG_DN; (* prepare confirmation of segment *)
+					TX_CNFM_SEG_DN(); (* prepare confirmation of segment *)
 				END_IF
 			END_IF
 		END_IF
@@ -151,7 +151,7 @@ IF CANSDO_DLC >= 1 THEN
 				Request_EXP := TRUE;
 				CMD_N := SEL( Request_LEN_KNOWN, CANSDO_DLC - 4, 4 - (SHR( CANSDO_DATA[0], 2 ) AND 3) );
 				IF (CMD_N = 0) OR ((CANSDO_DLC - 4) < CMD_N) THEN
-					TX_ERR_BAD_CMD; (* command doesn't make sense, not enough data was supplied *)
+					TX_ERR_BAD_CMD(); (* command doesn't make sense, not enough data was supplied *)
 				ELSE
 					Request_LEN := CMD_N; (* databytes either specified or that were present when unspecified *)
 					Request_RESULT := 3; (* dispatch a download *)
@@ -159,7 +159,7 @@ IF CANSDO_DLC >= 1 THEN
 			ELSE
 				(* download request, data to follow, is data length specified? *)
 				IF SEL( Request_LEN_KNOWN, FALSE, CANSDO_DLC < 8 ) THEN
-					TX_ERR_BAD_CMD; (* command doesn't make sense, not enough data was supplied *)
+					TX_ERR_BAD_CMD(); (* command doesn't make sense, not enough data was supplied *)
 				ELSE
 					Request_LEN := SEL( Request_LEN_KNOWN, 0, SHL( BYTE_TO_DWORD( CANSDO_DATA[7] ), 24 ) +
 					  SHL( BYTE_TO_DWORD( CANSDO_DATA[6] ), 16 ) + SHL( BYTE_TO_DWORD( CANSDO_DATA[5] ), 8 ) + CANSDO_DATA[4] );
@@ -184,8 +184,8 @@ IF CANSDO_DLC >= 1 THEN
 				Request_RESULT := SEL( ActXfr_Dn, 0, 1 ); (* reflect if another transfer in progress *)
 				Request_OBJ := ActXfr_Up_OBJ;
 				Request_SIDX := ActXfr_Up_SIDX;
-				TX_ERR_SEG_TOG; (* signal segment sequence error *)
-				ActXfr_Up_LTMR.C; (* clearing inactivity timer *)
+				TX_ERR_SEG_TOG(); (* signal segment sequence error *)
+				ActXfr_Up_LTMR.C(); (* clearing inactivity timer *)
 			ELSE
 				(* request for the next segment, prepare it *)
 				i := 0;
@@ -200,7 +200,7 @@ IF CANSDO_DLC >= 1 THEN
 				IF ActXfr_Up_BufRem = 0 THEN
 					ActXfr_Up := FALSE; (* transfer is complete *)
 					Request_RESULT := SEL( ActXfr_Dn, 0, 1 ); (* reflect if another transfer in progress *)
-					ActXfr_Up_LTMR.C; (* clearing inactivity timer *)
+					ActXfr_Up_LTMR.C(); (* clearing inactivity timer *)
 				ELSE
 					ActXfr_Up_BufPtr := ActXfr_Up_BufPtr + USINT_TO_DWORD( i ); (* update buffer for next segment *)
 				END_IF
@@ -213,7 +213,7 @@ IF CANSDO_DLC >= 1 THEN
 				CANSDO_TX := TRUE;
 				ActXfr_Up_SeqTog := NOT ActXfr_Up_SeqTog; (* waiting for next toggle *)
 				IF ActXfr_Up_LTMR.IN THEN
-					ActXfr_Up_LTMR.SR; (* reset inactivity timer, only if already active *)
+					ActXfr_Up_LTMR.SR(); (* reset inactivity timer, only if already active *)
 				END_IF
 			END_IF
 		END_IF
@@ -228,12 +228,12 @@ IF CANSDO_DLC >= 1 THEN
 				Request_BUFFEROVERRUN := FALSE;
 				Request_LEN := ActXfr_Dn_DLC;
 				Request_RESULT := 5; (* aborting the download *)
-				ActXfr_Dn_LTMR.C; (* clearing inactivity timer *)
+				ActXfr_Dn_LTMR.C(); (* clearing inactivity timer *)
 			ELSIF SEL( ActXfr_Up, FALSE, ActXfr_Up_OBJ = Request_OBJ AND ActXfr_Up_SIDX = Request_SIDX ) THEN
 				(* abort was for current upload, thats good *)
 				ActXfr_Up := FALSE;
 				Request_RESULT := SEL( ActXfr_Dn, 0, 1 ); (* reflect if another transfer in progress *)
-				ActXfr_Up_LTMR.C; (* clearing inactivity timer *)
+				ActXfr_Up_LTMR.C(); (* clearing inactivity timer *)
 			END_IF
 		END_IF
 	ELSE
@@ -247,7 +247,7 @@ IF CANSDO_DLC >= 1 THEN
 		*)
 		IF CANSDO_DLC >= 4 THEN
 			(* must have at least 4 data bytes to respond with a BAD_CMD error, anything else we just ignore *)
-			TX_ERR_BAD_CMD;
+			TX_ERR_BAD_CMD();
 		END_IF
 	END_CASE
 END_IF
@@ -256,14 +256,14 @@ END_FUNCTION_BLOCK
 ACTION	ChkTimers:
 IF ActXfr_Up THEN
 	IF ActXfr_Up_LTMR.IN THEN
-		ActXfr_Up_LTMR; (* update upload inactivity timer *)
+		ActXfr_Up_LTMR(); (* update upload inactivity timer *)
 		IF NOT ActXfr_Up_LTMR.Q THEN
 			(* inactivity timer has expired *)
 			ActXfr_Up := FALSE;
 			Request_RESULT := SEL( ActXfr_Dn, 0, 1 ); (* reflect if another transfer in progress *)
 			Request_OBJ := ActXfr_Dn_OBJ;
 			Request_SIDX := ActXfr_Dn_SIDX;
-			TX_ERR_TIME_OUT;
+			TX_ERR_TIME_OUT();
 		END_IF
 	END_IF
 END_IF
@@ -271,7 +271,7 @@ END_IF
 (* we can only check the download timer if the upload timer didn't generate an error transmission *)
 IF ActXfr_Dn AND NOT CANSDO_TX THEN
 	IF ActXfr_Dn_LTMR.IN THEN
-		ActXfr_Dn_LTMR; (* update download inactivity timer *)
+		ActXfr_Dn_LTMR(); (* update download inactivity timer *)
 		IF NOT ActXfr_Dn_LTMR.Q THEN
 			(* inactivity timer has expired *)
 			ActXfr_Dn := FALSE;
@@ -280,7 +280,7 @@ IF ActXfr_Dn AND NOT CANSDO_TX THEN
 			Request_OBJ := ActXfr_Dn_OBJ;
 			Request_SIDX := ActXfr_Dn_SIDX;
 			Request_RESULT := 5; (* aborting the download *)
-			TX_ERR_TIME_OUT;
+			TX_ERR_TIME_OUT();
 		END_IF
 	END_IF
 END_IF
@@ -304,7 +304,7 @@ CASE Request_RESULT OF
 	Request_RESULT := 5;
 7:
 	(* application must have accepted the expedited download without error *)
-	TX_ACK_EXP_DN;
+	TX_ACK_EXP_DN();
 END_CASE
 
 END_ACTION
@@ -312,7 +312,7 @@ END_ACTION
 ACTION	CLEAR_TX_REQ:
 (* CAN interface has transmitted our buffer, intended for use by the CAN preprocessor *)
 CANSDO_TX := FALSE;
-CleanUp; (* clear TX flag and clean up previous request results or pending actions *)
+CleanUp(); (* clear TX flag and clean up previous request results or pending actions *)
 END_ACTION
 
 ACTION	DispatchResponse:
@@ -330,7 +330,7 @@ IF Request_RESULT = 2 THEN
 			CANSDO_DATA[i + 4] := 0; (* blank unused bytes per specification *)
 			i := i + 1;
 		END_WHILE
-		TX_EXP_UP_RESP; (* let action complete this transaction *)
+		TX_EXP_UP_RESP(); (* let action complete this transaction *)
 	ELSE
 		(* standard response with segmented transfer to CONTINUE *)
 		ActXfr_Up_BufPtr := Response_BUFFER_PTR;
@@ -353,14 +353,14 @@ IF Request_RESULT = 2 THEN
 			Request_OBJ := ActXfr_Dn_OBJ;
 			Request_SIDX := ActXfr_Dn_SIDX;
 			Request_RESULT := 6; (* aborting the download on next cycle *)
-			ActXfr_Dn_LTMR.C; (* clearing inactivity timer *)
+			ActXfr_Dn_LTMR.C(); (* clearing inactivity timer *)
 		ELSE
 			Request_RESULT := 1; (* we're active *)
 		END_IF
 		IF Response_TO_TIME <> t#0s THEN
 			ActXfr_Up_LTMR.SR( PT:=Response_TO_TIME ); (* reset inactivity timer *)
 		ELSE
-			ActXfr_Up_LTMR.C; (* clear timer, not requested for this response *)
+			ActXfr_Up_LTMR.C(); (* clear timer, not requested for this response *)
 		END_IF
 		CANSDO_DLC := 8;
 		CANSDO_TX := TRUE;
@@ -399,7 +399,7 @@ ELSIF Request_RESULT = 3 THEN
 		IF Response_TO_TIME <> t#0s THEN
 			ActXfr_Dn_LTMR.SR( PT:=Response_TO_TIME ); (* reset inactivity timer *)
 		ELSE
-			ActXfr_Dn_LTMR.C; (* clear timer, not requested for this response *)
+			ActXfr_Dn_LTMR.C(); (* clear timer, not requested for this response *)
 		END_IF
 		CANSDO_IsEnum := FALSE; (* if this was an enumeration request, we've completed it *)
 	END_IF

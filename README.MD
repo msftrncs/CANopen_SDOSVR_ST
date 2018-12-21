@@ -8,7 +8,7 @@ You must supply a CAN interface pre-processor (receive & transmit), as the SDO S
 
 This implementation is based on a CoDeSys V2.3 environment.  It has been tested on IFM Classic and NT hardware.  It has been utilized in an application which involved multiple separate dictionary object post-processors and multiple CAN interface implementations on a single controller, including multiple instances of the SDO Server Protocol Processor.
 
--- -
+- - -
 ## SDO SVR Protocol Processor.ST
 ### FB_SDOSVR_PROC
 This is the primary SDO Server processing core, and can be re-used with nearly any CAN interface implementation and dictionary object implementation.
@@ -57,7 +57,7 @@ These actions of `FB_SDOSVR_PROC` service the needs of implementing dictionary o
 
 _[more information forthcoming regarding public actions of FB_SDOSVR_PROC]_
 
--- -
+- - -
 ## SDO SVR CAN Preprocessor IFM NT.ST
 This is an example CAN preprocessor for use with IFM NT hardware.  It includes a function block implementation for enumeration as well.  The action `InitSvr()` should be called for initialization of the function block `FB_SDOSVR_CAN_NT`.
 
@@ -116,22 +116,23 @@ Note that enumeration requests will be processed last, and with the lowest prior
 
 See the declarations for further details regarding the implementation of `FB_SDOSVR_CAN_NT` and  `FB_SDOSVR_CAN_NT_ENUM_RX`.
 
--- -
+- - -
 ## SDO SVR Standard Objects.ST
-An example dictionary object post-processor showing handling of an dictionary object request from the SDO server.  It shows CANopen standard objects 0x1000.00, 0x1008.00, 0x1009.00 and 0x1017.00.  Object 0x1017.00 (heartbeat time) demonstrates a writable object.
+An example dictionary object post-processor showing handling of an dictionary object request from the SDO server.  It shows CANopen standard objects 0x1000.00, 0x1008.00, 0x1009.00 and 0x1017.00.  Object 0x1017.00 (heartbeat time) demonstrates a writable object.  This example shows a static dictionary, but dynamic dictionaries would be easily handled as well.
 
 Function block FB_SDOSVR_STDOBJS has no implementation that is dependent on the CAN interface, and so is portable between projects.  Demonstration of this function block is shown in the example above.
 
--- -
+- - -
 ## What is an enumeration request?
 An enumeration request is not a standard CANopen function.  It is a concept where by devices (nodes) that support such a function can be identified rapidly with a single request.  CANopen COB-ID 0x600 is utilized, the contents of which forms a standard SDO request, preferably a read object request for a common object (such as 0x1000.00 aka Device Type).  All nodes that support the function respond back on their respective response COB-ID.  Generally enumeration requests are low frequency events usually associated with discovery or diagnosis.  The included example CAN pre-processor restricts enumeration requests to only SDO requests that are an initial request, however, there is no restriction that the object requested cannot be an object that requires segmented transfer, but the remainder of the segmented transfer must be conducted via the standard request/response COB-ID's.  Because of the complexity of segmented transfers, it is generally recommended to not use such objects in enumeration requests.
 
--- -
+- - -
 Additional notes:
 1. Please see the repository [TOS_ST](https://github.com/msftrncs/TOS_ST) for the function block TOS.  It is a timer function block like the standard function block TP, but with RESTART(RS) and CLEAR(C) functionality via actions.  It is used for handling activity time-out.
 1. Non IEC actions are used by this protocol processor, both for private and for public purposes.  Support for this could vary.
 1. Some code here may contain nested comments.
 1. More information will be coming for examples as to how to construct pre-processor/post-processor and dictionary object handlers and interface them with the protocol processor, and an application.
+1. Multiple simultaneous transfers requires each of the transfers (1 segmented upload, 1 segmented download, and 1 expedited of either direction) be for different objects, and that the client(s) handling those transfers must be capable of identifying the correct coresponding response messages.
 
 Change Log:
 - 2018-11-02 - Chk_Timers was removed from the example CAN preprocessor, utilizing a different scheme to make sure the transfer timers are checked.  CLEAR_TX_REQ in the protocol processor automatically performs clean up, and this has been accounted for in the example preprocessor.

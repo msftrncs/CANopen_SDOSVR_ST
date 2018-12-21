@@ -31,19 +31,19 @@ IF NOT INIT THEN
 			TX_CAN( DATA:=SDOSVR_PROC.CANSDO_DATA, DATALENGTHCODE:=SDOSVR_PROC.CANSDO_DLC );
 			TX_BUFFER_FULL := TX_CAN.RESULT = 250; (* track if TX FIFO is full *)
 			IF NOT TX_BUFFER_FULL THEN
-				SDOSVR_PROC.CLEAR_TX_REQ; (* clear TX flag and clean up previous request results or pending actions *)
+				SDOSVR_PROC.CLEAR_TX_REQ(); (* clear TX flag and clean up previous request results or pending actions *)
 			ELSIF Enum_RX_Flag THEN (* added 2018-06-19 CMM, moved to TX section 2018-11-02 CMM *)
 				(* Enumeration request was pending, but with no way to respond to it, we must abandon it *)
 				Enum_RX_Flag := FALSE;
 			END_IF
 		ELSE
-			SDOSVR_PROC.CleanUp; (* clean up any previous request results and pending actions, sending INV_OBJ if required (generating another transmit) *)
+			SDOSVR_PROC.CleanUp(); (* clean up any previous request results and pending actions, sending INV_OBJ if required (generating another transmit) *)
 		END_IF
 
 		(* if a pending transmit is still pending, we cannot process any received messages, as they may cause transmission requests *)
 		IF SEL( SDOSVR_PROC.CANSDO_TX, SDOSVR_PROC.Request_RESULT <= 1, FALSE ) THEN
 			(* all seems to be good, check RX, and if any, attempt to process *)
-			RX_CAN;
+			RX_CAN();
 			RX_BUFFER_EMPTY := NOT RX_CAN.MORE_DATA_AVAILABLE;
 			IF RX_CAN.RESULT = 1 OR RX_CAN.RESULT = 250 THEN
 				SDOSVR_PROC( CANSDO_DATA:=RX_CAN.DATA, CANSDO_DLC:=RX_CAN.DATALENGTHCOUNT );
@@ -56,7 +56,7 @@ IF NOT INIT THEN
 			END_IF
 			IF SEL( SDOSVR_PROC.Request_RESULT = 1, FALSE, SEL( SDOSVR_PROC.CANSDO_TX, RX_BUFFER_EMPTY, FALSE ) ) THEN
 				(* SDO service has active transfers, but is presently idle, check transfer timers *)
-				SDOSVR_PROC.ChkTimers; (* need to process timers, aborting transfers if timers have expired *)
+				SDOSVR_PROC.ChkTimers(); (* need to process timers, aborting transfers if timers have expired *)
 			END_IF
 		END_IF
 
@@ -85,7 +85,7 @@ END_ACTION
 (* @PATH := '\/SDO Server' *)
 (* @OBJECTFLAGS := '0, 8' *)
 (* @SYMFILEFLAGS := '2048' *)
-FUNCTIONBLOCK FB_SDOSVR_CAN_NT_ENUM_RX (* SDO Server Enumeration Interface for IFM NT Hardware *)
+FUNCTION_BLOCK FB_SDOSVR_CAN_NT_ENUM_RX (* SDO Server Enumeration Interface for IFM NT Hardware *)
 VAR_INPUT
 	CHANNEL : BYTE; (* CAN channel as required by CAN RX/TX *)
 END_VAR
@@ -130,7 +130,7 @@ IF INIT THEN
 END_IF
 
 REPEAT
-	RX_CAN;
+	RX_CAN();
 	(* only accept request messages with at least 4 data bytes, where CCS either 1 or 2 *)
 	AVAILABLE := SEL( RX_CAN.RESULT = 1 OR RX_CAN.RESULT = 250, FALSE, SEL( RX_CAN.DATALENGTHCOUNT >= 4, FALSE, MUX( MIN( SHR( RX_CAN.DATA[0], 5 ), 3 ), FALSE, TRUE, TRUE, FALSE ) ) );
 
