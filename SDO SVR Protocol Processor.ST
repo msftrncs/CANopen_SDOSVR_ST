@@ -253,6 +253,7 @@ IF CANSDO_DLC >= 1 THEN
 END_IF
 
 END_FUNCTION_BLOCK
+
 ACTION	ChkTimers:
 IF ActXfr_Up THEN
 	IF ActXfr_Up_LTMR.IN THEN
@@ -294,7 +295,7 @@ ACTION	CleanUp:
 CASE Request_RESULT OF
 2,3:
 	(* download or upload request was not acted upon, must be an invalid object *)
-	TX_ERR_INV_OBJ; (* object of request must have been invalid and could not be found *)
+	TX_ERR_INV_OBJ(); (* object of request must have been invalid and could not be found *)
 4,5:
 	(* when = 4, applicatiom must have accepted the download completion without error *)
 	Request_RESULT := SEL( ActXfr_Dn OR ActXfr_Up, 0, 1 );
