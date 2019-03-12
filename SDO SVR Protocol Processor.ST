@@ -297,7 +297,7 @@ CASE Request_RESULT OF
 	(* download or upload request was not acted upon, must be an invalid object *)
 	TX_ERR_INV_OBJ(); (* object of request must have been invalid and could not be found *)
 4,5:
-	(* when = 4, applicatiom must have accepted the download completion without error *)
+	(* when = 4, application must have accepted the download completion without error *)
 	Request_RESULT := SEL( ActXfr_Dn OR ActXfr_Up, 0, 1 );
 6:
 	(* application accepted an upload request which coincides with an active download,
